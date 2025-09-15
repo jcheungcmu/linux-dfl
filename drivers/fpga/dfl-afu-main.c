@@ -432,8 +432,10 @@ static int port_hdr_init(struct platform_device *pdev,
 
 	rev = dfl_feature_revision(base);
 
-	if (rev < 2)
+	if (rev < 2) {
+		printk("\nport_hdr_init reset %s", pdev->name);
 		port_reset(pdev);
+	}
 	else if (rev > 2)
 		dev_info(&pdev->dev, "unexpected port feature revision, %u\n", rev);
 
@@ -448,8 +450,10 @@ port_hdr_ioctl(struct platform_device *pdev, struct dfl_feature *feature,
 
 	switch (cmd) {
 	case DFL_FPGA_PORT_RESET:
-		if (!arg)
+		if (!arg) {
 			ret = port_reset(pdev);
+			printk("\nport_hdr_ioctl reset %s", pdev->name);
+		}
 		else
 			ret = -EINVAL;
 		break;

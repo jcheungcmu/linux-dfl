@@ -4363,7 +4363,7 @@ void __iomem *devm_pci_remap_cfg_resource(struct device *dev,
 		return IOMEM_ERR_PTR(-ENOMEM);
 
 	if (!devm_request_mem_region(dev, res->start, size, name)) {
-		dev_err(dev, "can't request region for resource %pR\n", res);
+		dev_err(dev, "pci can't request region for resource %pR\n", res);
 		return IOMEM_ERR_PTR(-EBUSY);
 	}
 

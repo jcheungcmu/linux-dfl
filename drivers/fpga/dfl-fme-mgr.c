@@ -36,7 +36,7 @@
 /* FME PR Control Register Bitfield */
 #define FME_PR_CTRL_PR_RST	BIT_ULL(0)  /* Reset PR engine */
 #define FME_PR_CTRL_PR_RSTACK	BIT_ULL(4)  /* Ack for PR engine reset */
-#define FME_PR_CTRL_PR_RGN_ID	GENMASK_ULL(9, 7)       /* PR Region ID */
+#define FME_PR_CTRL_PR_RGN_ID	GENMASK_ULL(9, 8)       /* PR Region ID */
 #define FME_PR_CTRL_PR_START	BIT_ULL(12) /* Start to request PR service */
 #define FME_PR_CTRL_PR_COMPLETE	BIT_ULL(13) /* PR data push completion */
 

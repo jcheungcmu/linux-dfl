@@ -590,6 +590,8 @@ struct dfl_fpga_cdev {
 	struct list_head port_dev_list;
 	struct list_head priv_feat_dev_list;
 	int released_port_num;
+
+	struct dfl_fpga_cdev *cdev2;
 };
 
 struct dfl_fpga_cdev *

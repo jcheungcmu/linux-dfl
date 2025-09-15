@@ -375,8 +375,10 @@ static int cci_enumerate_feature_devs(struct pci_dev *pcidev)
 	}
 
 	ret = find_dfls_by_vsec(pcidev, info);
-	if (ret == -ENODEV)
+	if (ret == -ENODEV) {
+		dev_info(&pcidev->dev, "JASON No DFL VSEC found, try default method\n");
 		ret = find_dfls_by_default(pcidev, info);
+	}
 
 	if (ret)
 		goto irq_free_exit;

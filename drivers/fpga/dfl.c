@@ -846,6 +846,9 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 		struct dfl_feature_irq_ctx *ctx;
 		unsigned int i;
 
+		dev_info(binfo->dev, "JASON BINFO_CREATE_FEATURE_DEV_DATA 0x%x\n",
+			finfo->fid);
+
 		/* save resource information for each feature */
 		feature->id = finfo->fid;
 		feature->revision = finfo->revision;
@@ -870,6 +873,8 @@ binfo_create_feature_dev_data(struct build_feature_devs_info *binfo)
 		 * devices (dfl-fme/afu) again.
 		 */
 		if (is_header_feature(feature)) {
+					dev_info(binfo->dev, "JASON BUILD FEATURE_DEV FOR FIU 0x%x\n",
+			finfo->fid);
 			feature->resource_index = -1;
 			feature->ioaddr =
 				devm_ioremap_resource(binfo->dev,
@@ -960,6 +965,55 @@ err_put_dev:
 	return ret;
 }
 
+/*
+ * register current feature device, it is called when we need to switch to
+ * another feature parsing or we have parsed all features on given device
+ * feature list.
+ */
+static int jason_feature_dev_register(struct dfl_feature_dev_data *fdata)
+{
+
+	struct dfl_feature_platform_data pdata = { 0 };
+	struct platform_device *fdev;
+	struct dfl_feature *feature;
+	int ret;
+
+	fdev = platform_device_alloc(fdata->pdev_name, fdata->pdev_id);
+	if (!fdev)
+		return -ENOMEM;
+
+	fdata->dev = fdev;
+
+	// fdev->dev.parent = &fdata->dfl_cdev->region->dev;
+	fdev->dev.devt = dfl_get_devt(dfl_devs[fdata->type].devt_type,
+				      fdev->id);
+
+	dfl_fpga_dev_for_each_feature(fdata, feature)
+		feature->dev = fdev;
+
+	ret = platform_device_add_resources(fdev, fdata->resources,
+					    fdata->resource_num);
+	if (ret)
+		goto err_put_dev;
+
+	pdata.fdata = fdata;
+	ret = platform_device_add_data(fdev, &pdata, sizeof(pdata));
+	if (ret)
+		goto err_put_dev;
+
+	ret = platform_device_add(fdev);
+	if (ret)
+		goto err_put_dev;
+
+	return 0;
+
+err_put_dev:
+	platform_device_put(fdev);
+	fdata->dev = NULL;
+
+	return ret;
+}
+
 static void feature_dev_unregister(struct dfl_feature_dev_data *fdata)
 {
 	platform_device_unregister(fdata->dev);
@@ -975,16 +1029,32 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 	if (IS_ERR(fdata))
 		return PTR_ERR(fdata);
 
-	ret = feature_dev_register(fdata);
+
+	if (binfo->type == PORT_ID && (fdata->pdev_id == 1 || fdata->pdev_id == 2)) {
+		ret = jason_feature_dev_register(fdata);
+	}
+	else {
+		ret = feature_dev_register(fdata);
+	}
+
+//	ret = feature_dev_register(fdata);
+	
+	
 	if (ret)
 		return ret;
 
-	if (binfo->type == PORT_ID)
+	if (binfo->type == PORT_ID) {
+		dev_info(binfo->dev, "JASON BUILD_INFO_COMMIT_DEV PORT_ID");
 		dfl_fpga_cdev_add_port_data(binfo->cdev, fdata);
-	else if (binfo->type == PRIV_FEAT_ID)
+	}
+	else if (binfo->type == PRIV_FEAT_ID) {
+		dev_info(binfo->dev, "JASON BUILD_INFO_COMMIT_DEV PRIV_FEAT_ID");
 		dfl_fpga_cdev_add_priv_feat_data(binfo->cdev, fdata);
-	else
+	}
+	else { 
+		dev_info(binfo->dev, "JASON BUILD_INFO_COMMIT_DEV FME_ID");
 		binfo->cdev->fme_dev = get_device(&fdata->dev->dev);
+	}
 
 	/* reset the binfo for next FIU */
 	binfo->type = DFL_ID_MAX;
@@ -1101,6 +1171,8 @@ static int parse_feature_irqs(struct build_feature_devs_info *binfo,
 	int virq;
 	u64 *p;
 	u64 v;
+
+	dev_info(binfo->dev, "JASON DFH VERSION DFH version %d\n", finfo->dfh_version);
 
 	switch (finfo->dfh_version) {
 	case 0:
@@ -1355,6 +1427,8 @@ static int parse_feature_port_afu(struct build_feature_devs_info *binfo,
 
 	WARN_ON(!size);
 
+	
+
 	return create_feature_instance(binfo, ofst, size, FEATURE_ID_AFU);
 }
 
@@ -1384,11 +1458,11 @@ static int build_info_prepare(struct build_feature_devs_info *binfo,
 	struct device *dev = binfo->dev;
 	void __iomem *ioaddr;
 
-	if (!devm_request_mem_region(dev, start, len, dev_name(dev))) {
-		dev_err(dev, "request region fail, start:%pa, len:%pa\n",
-			&start, &len);
-		return -EBUSY;
-	}
+	// if (!devm_request_mem_region(dev, start, len, dev_name(dev))) {
+	// 	dev_err(dev, "request region fail, start:%pa, len:%pa\n",
+	// 		&start, &len);
+	// 	return -EBUSY;
+	// }
 
 	ioaddr = devm_ioremap(dev, start, len);
 	if (!ioaddr) {
@@ -1419,9 +1493,13 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 	u16 id;
 	u64 v;
 
+	dev_info(binfo->dev, "JASON ENTER PARSE_FEATURE_FIU\n");
+
 	if (is_feature_dev_detected(binfo)) {
 		build_info_complete(binfo);
+		dev_info(binfo->dev, "JASON PARSE_FEATURE_FIU ENTERING BUILD_INFO_COMMIT_DEV\n");
 
+    // CREATES FME DEV
 		ret = build_info_commit_dev(binfo);
 		if (ret)
 			return ret;
@@ -1456,7 +1534,7 @@ static int parse_feature_fiu(struct build_feature_devs_info *binfo,
 	if (offset)
 		return parse_feature_afu(binfo, offset);
 
-	dev_dbg(binfo->dev, "No AFUs detected on FIU %d\n", id);
+	dev_info(binfo->dev, "No AFUs detected on FIU %d\n", id);
 
 	return ret;
 }
@@ -1466,6 +1544,7 @@ static int parse_feature_private(struct build_feature_devs_info *binfo,
 {
 	u8 dfh_ver;
 	u64 v;
+	u16 id;
 
 	v = readq(binfo->ioaddr + DFH);
 	dfh_ver = FIELD_GET(DFH_VERSION, v);
@@ -1479,6 +1558,15 @@ static int parse_feature_private(struct build_feature_devs_info *binfo,
 	if (dfh_ver == 1)
 		binfo->type = PRIV_FEAT_ID;
 
+	dev_info(binfo->dev, "JASON PARSING PRIVATE FEATURE 0x%x\n",
+		feature_id(readq(binfo->ioaddr + ofst)));
+
+	id = feature_id(readq(binfo->ioaddr + ofst));
+
+	if (id == FME_FEATURE_ID_PR_MGMT) {
+		dev_info(binfo->dev, "FOUND PR_MGMT_FEATURE\n");
+	}
+	
 	return create_feature_instance(binfo, ofst, 0, 0);
 }
 
@@ -1497,6 +1585,8 @@ static int parse_feature(struct build_feature_devs_info *binfo,
 	v = readq(binfo->ioaddr + ofst + DFH);
 	type = FIELD_GET(DFH_TYPE, v);
 
+	dev_info(binfo->dev,
+			"JASON PARSING FEATURE TYPE %x \n", type);
 	switch (type) {
 	case DFH_TYPE_AFU:
 		return parse_feature_afu(binfo, ofst);
@@ -1522,6 +1612,7 @@ static int parse_feature_list(struct build_feature_devs_info *binfo,
 	u32 ofst = 0;
 	u64 v;
 
+	dev_info(binfo->dev, "ENTER PARSE_FEATURE_LIST\n");
 	ret = build_info_prepare(binfo, start, len);
 	if (ret)
 		return ret;
@@ -1548,9 +1639,11 @@ static int parse_feature_list(struct build_feature_devs_info *binfo,
 	/* commit current feature device when reach the end of list */
 	build_info_complete(binfo);
 
-	if (is_feature_dev_detected(binfo))
+  // CREATES PORT DEV
+	if (is_feature_dev_detected(binfo)) {
+		dev_info(binfo->dev, "JASON PARSE_FEATURE_LIST ENTERING BUILD_INFO_COMMIT_DEV\n");
 		ret = build_info_commit_dev(binfo);
-
+	}
 	return ret;
 }
 
@@ -1699,7 +1792,11 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	struct build_feature_devs_info *binfo;
 	struct dfl_fpga_enum_dfl *dfl;
 	struct dfl_fpga_cdev *cdev;
+	struct build_feature_devs_info *binfo2;
+	struct dfl_fpga_cdev *cdev2;
 	int ret = 0;
+	int count = 0;
+
 
 	if (!info->dev)
 		return ERR_PTR(-ENODEV);
@@ -1720,7 +1817,7 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 		goto free_cdev_exit;
 	}
 
-	/* create and init build info for enumeration */
+	// create and init build info for enumeration 
 	binfo = devm_kzalloc(info->dev, sizeof(*binfo), GFP_KERNEL);
 	if (!binfo) {
 		ret = -ENOMEM;
@@ -1736,12 +1833,17 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	if (info->nr_irqs)
 		binfo->irq_table = info->irq_table;
 
-	/*
-	 * start enumeration for all feature devices based on Device Feature
-	 * Lists.
-	 */
+
+	dev_info(binfo->dev,
+			"*********************JASON ENUMERATING DFL FIRST PASS *****************\n");
+
+	//
+	// start enumeration for all feature devices based on Device Feature
+	// Lists.
+	//
 	if (!list_empty(&info->dfls)) {
 		list_for_each_entry(dfl, &info->dfls, node) {
+			count += 1;
 			ret = parse_feature_list(binfo, dfl->start, dfl->len);
 			if (ret) {
 				remove_feature_devs(cdev);
@@ -1750,16 +1852,90 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 			}
 		}
 	}
+	dev_info(binfo->dev, "JASON NUMBER OF DFLS: %d\n", count);
 
+
+
+	// JASON
+
+	dev_info(binfo->dev,
+			"*********************JASON ENUMERATING DFL SECOND PASS *****************\n");
+	if (!info->dev)
+		return ERR_PTR(-ENODEV);
+
+	cdev2 = devm_kzalloc(info->dev, sizeof(*cdev2), GFP_KERNEL);
+	cdev->cdev2 = cdev2;
+	if (!cdev2)
+		return ERR_PTR(-ENOMEM);
+
+	cdev2->parent = info->dev;
+	mutex_init(&cdev2->lock);
+	INIT_LIST_HEAD(&cdev2->port_dev_list);
+
+	INIT_LIST_HEAD(&cdev2->priv_feat_dev_list);
+
+	cdev2->region = fpga_region_register(info->dev, NULL, NULL);
+	if (IS_ERR(cdev2->region)) {
+		ret = PTR_ERR(cdev2->region);
+		goto free_cdev2_exit;
+	}
+
+	// create and init build info for enumeration 
+
+	binfo2 = devm_kzalloc(info->dev, sizeof(*binfo2), GFP_KERNEL);
+	if (!binfo2) {
+		ret = -ENOMEM;
+		goto unregister_region_exit2;
+	}
+
+	binfo2->type = DFL_ID_MAX;
+	binfo2->dev = info->dev;
+	binfo2->cdev = cdev2;
+	INIT_LIST_HEAD(&binfo2->sub_features);
+
+	binfo2->nr_irqs = info->nr_irqs;
+	if (info->nr_irqs)
+		binfo2->irq_table = info->irq_table;
+
+	//
+	// start enumeration for all feature devices based on Device Feature
+	// Lists.
+	//
+	if (!list_empty(&info->dfls)) {
+		list_for_each_entry(dfl, &info->dfls, node) {
+			
+			ret = parse_feature_list(binfo2, dfl->start, dfl->len);
+			if (ret) {
+				remove_feature_devs(cdev2);
+				build_info_free(binfo2);
+				goto unregister_region_exit2;
+			}
+		}
+
+
+	}
+
+	build_info_free(binfo2);
+
+	
 	build_info_free(binfo);
 
 	return cdev;
+
+
+unregister_region_exit2:
+	fpga_region_unregister(cdev2->region);
+free_cdev2_exit:
+	devm_kfree(info->dev, cdev2);
 
 unregister_region_exit:
 	fpga_region_unregister(cdev->region);
 free_cdev_exit:
 	devm_kfree(info->dev, cdev);
+
 	return ERR_PTR(ret);
+
+
 }
 EXPORT_SYMBOL_GPL(dfl_fpga_feature_devs_enumerate);
 

@@ -147,12 +147,12 @@ __devm_ioremap_resource(struct device *dev, const struct resource *res,
 		dev_err(dev, "can't generate pretty name for resource %pR\n", res);
 		return IOMEM_ERR_PTR(-ENOMEM);
 	}
-
+/*
 	if (!devm_request_mem_region(dev, res->start, size, pretty_name)) {
-		dev_err(dev, "can't request region for resource %pR\n", res);
+		dev_err(dev, "devres can't request region for resource %pR\n", res);
 		return IOMEM_ERR_PTR(-EBUSY);
 	}
-
+*/
 	dest_ptr = __devm_ioremap(dev, res->start, size, type);
 	if (!dest_ptr) {
 		dev_err(dev, "ioremap failed for resource %pR\n", res);

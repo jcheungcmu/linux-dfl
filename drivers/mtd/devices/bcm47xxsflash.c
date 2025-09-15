@@ -301,7 +301,7 @@ static int bcm47xxsflash_bcma_probe(struct platform_device *pdev)
 	}
 	if (!devm_request_mem_region(dev, res->start, resource_size(res),
 				     res->name)) {
-		dev_err(dev, "can't request region for resource %pR\n", res);
+		dev_err(dev, "bcm47xxsflash can't request region for resource %pR\n", res);
 		return -EBUSY;
 	}
 
