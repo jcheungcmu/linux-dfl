@@ -147,6 +147,10 @@ static void cci_remove_feature_devs(struct pci_dev *pcidev)
 	struct cci_drvdata *drvdata = pci_get_drvdata(pcidev);
 
 	/* remove all children feature devices */
+	dfl_fpga_feature_devs_remove(drvdata->cdev->cdev4);
+	dfl_fpga_feature_devs_remove(drvdata->cdev->cdev3);
+	dfl_fpga_feature_devs_remove(drvdata->cdev->cdev2);
+
 	dfl_fpga_feature_devs_remove(drvdata->cdev);
 	cci_pci_free_irq(pcidev);
 }

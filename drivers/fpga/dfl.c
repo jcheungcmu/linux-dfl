@@ -745,6 +745,8 @@ struct build_feature_devs_info {
 	resource_size_t len;
 	struct list_head sub_features;
 	int feature_num;
+
+	int jason_port_id;
 };
 
 /**
@@ -1030,15 +1032,36 @@ static int build_info_commit_dev(struct build_feature_devs_info *binfo)
 		return PTR_ERR(fdata);
 
 
-	if (binfo->type == PORT_ID && (fdata->pdev_id == 1 || fdata->pdev_id == 2)) {
-		ret = jason_feature_dev_register(fdata);
-	}
-	else {
-		ret = feature_dev_register(fdata);
-	}
+	// if (binfo->type == PORT_ID && (
+	// 	!(binfo->jason_port_id == 0 && fdata->pdev_id == 0) &&
+	// 	!(binfo->jason_port_id == 5 && fdata->pdev_id == 5) &&
+	// 	!(binfo->jason_port_id == 10 && fdata->pdev_id == 10) &&
+	// 	!(binfo->jason_port_id == 15 && fdata->pdev_id == 15)
+	// )) {
+	// 	ret = jason_feature_dev_register(fdata);
 
-//	ret = feature_dev_register(fdata);
-	
+	// }
+	// else 
+	// {
+	// 	ret = feature_dev_register(fdata);
+	// }
+
+	{
+		ret = feature_dev_register(fdata);
+		
+		// if (binfo->type == PORT_ID && (
+		// 	// fdata->pdev_id != 0 && fdata->pdev_id != 5 && fdata->pdev_id != 10 && fdata->pdev_id != 15
+
+		// 	!(binfo->jason_port_id == 0 && fdata->pdev_id == 0) &&
+		// 	!(binfo->jason_port_id == 5 && fdata->pdev_id == 5) &&
+		// 	!(binfo->jason_port_id == 10 && fdata->pdev_id == 10) &&
+		// 	!(binfo->jason_port_id == 15 && fdata->pdev_id == 15)
+		// 	)) {
+		// 	feature_dev_unregister(fdata);
+		// 	dfl_id_free(fdata->type, fdata->pdev_id);
+
+		// }
+	}
 	
 	if (ret)
 		return ret;
@@ -1792,12 +1815,25 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	struct build_feature_devs_info *binfo;
 	struct dfl_fpga_enum_dfl *dfl;
 	struct dfl_fpga_cdev *cdev;
+
 	struct build_feature_devs_info *binfo2;
+	struct dfl_fpga_enum_dfl *dfl2;
 	struct dfl_fpga_cdev *cdev2;
+
+
+	struct build_feature_devs_info *binfo3;
+	struct dfl_fpga_enum_dfl *dfl3;
+	struct dfl_fpga_cdev *cdev3;
+
+
+	struct build_feature_devs_info *binfo4;
+	struct dfl_fpga_enum_dfl *dfl4;
+	struct dfl_fpga_cdev *cdev4;
+
 	int ret = 0;
+
+	////////////////////////////////////////////////////////////////////////////
 	int count = 0;
-
-
 	if (!info->dev)
 		return ERR_PTR(-ENODEV);
 
@@ -1827,16 +1863,16 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	binfo->type = DFL_ID_MAX;
 	binfo->dev = info->dev;
 	binfo->cdev = cdev;
+	binfo->jason_port_id = 0;
 	INIT_LIST_HEAD(&binfo->sub_features);
 
 	binfo->nr_irqs = info->nr_irqs;
 	if (info->nr_irqs)
 		binfo->irq_table = info->irq_table;
 
-
 	dev_info(binfo->dev,
 			"*********************JASON ENUMERATING DFL FIRST PASS *****************\n");
-
+			
 	//
 	// start enumeration for all feature devices based on Device Feature
 	// Lists.
@@ -1860,6 +1896,7 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 
 	dev_info(binfo->dev,
 			"*********************JASON ENUMERATING DFL SECOND PASS *****************\n");
+	count = 0;
 	if (!info->dev)
 		return ERR_PTR(-ENODEV);
 
@@ -1891,6 +1928,7 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	binfo2->type = DFL_ID_MAX;
 	binfo2->dev = info->dev;
 	binfo2->cdev = cdev2;
+	binfo2->jason_port_id = 5;
 	INIT_LIST_HEAD(&binfo2->sub_features);
 
 	binfo2->nr_irqs = info->nr_irqs;
@@ -1902,9 +1940,9 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 	// Lists.
 	//
 	if (!list_empty(&info->dfls)) {
-		list_for_each_entry(dfl, &info->dfls, node) {
+		list_for_each_entry(dfl2, &info->dfls, node) {
 			
-			ret = parse_feature_list(binfo2, dfl->start, dfl->len);
+			ret = parse_feature_list(binfo2, dfl2->start, dfl2->len);
 			if (ret) {
 				remove_feature_devs(cdev2);
 				build_info_free(binfo2);
@@ -1915,12 +1953,147 @@ dfl_fpga_feature_devs_enumerate(struct dfl_fpga_enum_info *info)
 
 	}
 
-	build_info_free(binfo2);
 
-	
+	dev_info(binfo->dev,
+			"*********************JASON ENUMERATING DFL THIRD PASS *****************\n");
+	count = 0;
+	if (!info->dev)
+		return ERR_PTR(-ENODEV);
+
+	cdev3 = devm_kzalloc(info->dev, sizeof(*cdev3), GFP_KERNEL);
+	cdev->cdev3 = cdev3;
+	if (!cdev3)
+		return ERR_PTR(-ENOMEM);
+
+	cdev3->parent = info->dev;
+	mutex_init(&cdev3->lock);
+	INIT_LIST_HEAD(&cdev3->port_dev_list);
+
+	INIT_LIST_HEAD(&cdev3->priv_feat_dev_list);
+
+	cdev3->region = fpga_region_register(info->dev, NULL, NULL);
+	if (IS_ERR(cdev3->region)) {
+		ret = PTR_ERR(cdev3->region);
+		goto free_cdev3_exit;
+	}
+
+	// create and init build info for enumeration 
+
+	binfo3 = devm_kzalloc(info->dev, sizeof(*binfo3), GFP_KERNEL);
+	if (!binfo3) {
+		ret = -ENOMEM;
+		goto unregister_region_exit3;
+	}
+
+	binfo3->type = DFL_ID_MAX;
+	binfo3->dev = info->dev;
+	binfo3->cdev = cdev3;
+	binfo3->jason_port_id = 10;
+	INIT_LIST_HEAD(&binfo3->sub_features);
+
+	binfo3->nr_irqs = info->nr_irqs;
+	if (info->nr_irqs)
+		binfo3->irq_table = info->irq_table;
+
+	//
+	// start enumeration for all feature devices based on Device Feature
+	// Lists.
+	//
+	if (!list_empty(&info->dfls)) {
+		list_for_each_entry(dfl3, &info->dfls, node) {
+			
+			ret = parse_feature_list(binfo3, dfl3->start, dfl3->len);
+			if (ret) {
+				remove_feature_devs(cdev3);
+				build_info_free(binfo3);
+				goto unregister_region_exit3;
+			}
+		}
+
+
+	}
+
+	dev_info(binfo->dev,
+			"*********************JASON ENUMERATING DFL FOURTH PASS *****************\n");
+	count = 0;
+	if (!info->dev)
+		return ERR_PTR(-ENODEV);
+
+	cdev4 = devm_kzalloc(info->dev, sizeof(*cdev4), GFP_KERNEL);
+	cdev->cdev4 = cdev4;
+	if (!cdev4)
+		return ERR_PTR(-ENOMEM);
+
+	cdev4->parent = info->dev;
+	mutex_init(&cdev4->lock);
+	INIT_LIST_HEAD(&cdev4->port_dev_list);
+
+	INIT_LIST_HEAD(&cdev4->priv_feat_dev_list);
+
+	cdev4->region = fpga_region_register(info->dev, NULL, NULL);
+	if (IS_ERR(cdev4->region)) {
+		ret = PTR_ERR(cdev4->region);
+		goto free_cdev4_exit;
+	}
+
+	// create and init build info for enumeration 
+
+	binfo4 = devm_kzalloc(info->dev, sizeof(*binfo4), GFP_KERNEL);
+	if (!binfo4) {
+		ret = -ENOMEM;
+		goto unregister_region_exit4;
+	}
+
+	binfo4->type = DFL_ID_MAX;
+	binfo4->dev = info->dev;
+	binfo4->cdev = cdev4;
+	binfo4->jason_port_id = 15;
+	INIT_LIST_HEAD(&binfo4->sub_features);
+
+	binfo4->nr_irqs = info->nr_irqs;
+	if (info->nr_irqs)
+		binfo4->irq_table = info->irq_table;
+
+	//
+	// start enumeration for all feature devices based on Device Feature
+	// Lists.
+	//
+	if (!list_empty(&info->dfls)) {
+		list_for_each_entry(dfl4, &info->dfls, node) {
+			
+			ret = parse_feature_list(binfo4, dfl4->start, dfl4->len);
+			if (ret) {
+				remove_feature_devs(cdev4);
+				build_info_free(binfo4);
+				goto unregister_region_exit4;
+			}
+		}
+
+
+	}
+
+
+	dev_info(binfo->dev, "FREE binfo4\n");
+	build_info_free(binfo4);
+	dev_info(binfo->dev, "FREE binfo3\n");
+	build_info_free(binfo3);
+	dev_info(binfo->dev, "FREE binfo2\n");
+	build_info_free(binfo2);
+	dev_info(binfo->dev, "FREE binfo\n");
 	build_info_free(binfo);
 
 	return cdev;
+
+unregister_region_exit4:
+	fpga_region_unregister(cdev4->region);
+free_cdev4_exit:
+	devm_kfree(info->dev, cdev4);
+
+
+unregister_region_exit3:
+	fpga_region_unregister(cdev3->region);
+free_cdev3_exit:
+	devm_kfree(info->dev, cdev3);
 
 
 unregister_region_exit2:

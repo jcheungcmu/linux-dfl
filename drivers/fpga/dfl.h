@@ -592,6 +592,8 @@ struct dfl_fpga_cdev {
 	int released_port_num;
 
 	struct dfl_fpga_cdev *cdev2;
+	struct dfl_fpga_cdev *cdev3;
+	struct dfl_fpga_cdev *cdev4;
 };
 
 struct dfl_fpga_cdev *
